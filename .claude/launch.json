@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "imposters",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["serve.py", "8090"],
+      "port": 8090
+    }
+  ]
+}
