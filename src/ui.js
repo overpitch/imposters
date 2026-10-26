@@ -2,7 +2,7 @@
 
 import { COLORS, SLOT_COLORS, SETTINGS as S } from './config.js';
 import { ROOMS, HALLS, STATIONS, SABOTAGES, WORLD } from './map.js';
-import { text, panel, button, rich, drawCrew, drawBody } from './draw.js';
+import { text, panel, button, rich, drawCrew, drawBody, kbText, setGlyphs } from './draw.js';
 
 const TAU = Math.PI * 2;
 export const uOf = (w, h) => Math.min(w / 1920, h / 1080);
@@ -34,10 +34,16 @@ export function drawLobby(ctx, W, H, st) {
   ctx.shadowColor = '#ff2a2a'; ctx.shadowBlur = 30 * u;
   text(ctx, 'IMPOSTERS', W / 2, H * 0.11, 140 * u, '#ff3b3b', { weight: 900, stroke: 10 * u });
   ctx.restore();
-  text(ctx, '8 players · 2 Imposters · who is it?', W / 2, H * 0.2, 30 * u, '#c9d1e0', { weight: 700 });
+  text(ctx, '8 players · 2 Imposters · who is it?', W / 2, H * 0.19, 30 * u, '#c9d1e0', { weight: 700 });
 
-  const n = 4, cw = 400 * u, ch = 520 * u, gap = 40 * u;
-  const x0 = W / 2 - (n * cw + (n - 1) * gap) / 2, cy = H * 0.27;
+  // Settings: controls and role.
+  const sy = H * 0.255;
+  pickerPill(ctx, W / 2 - 360 * u, sy, u, 'X', [{ icon: '🎮', label: 'Xbox' }, { icon: '⌨️', label: 'Computer' }], st.settings.computer ? 1 : 0, 'Controls');
+  pickerPill(ctx, W / 2 + 330 * u, sy, u, 'Y', [{ icon: '🎲', label: 'Random' }, { icon: '🧑‍🚀', label: 'Crewmate' }, { icon: '🔪', label: 'Imposter' }],
+    ['random', 'crew', 'imp'].indexOf(st.settings.role), 'Role');
+
+  const n = 4, cw = 400 * u, ch = 480 * u, gap = 40 * u;
+  const x0 = W / 2 - (n * cw + (n - 1) * gap) / 2, cy = H * 0.31;
   for (let i = 0; i < n; i++) drawSlotCard(ctx, x0 + i * (cw + gap), cy, cw, ch, u, i, st);
 
   const joined = st.slots.filter(Boolean).length;
@@ -46,8 +52,29 @@ export function drawLobby(ctx, W, H, st) {
   else if (st.countdown !== null) text(ctx, `Starting in ${Math.ceil(st.countdown)}…`, W / 2, H * 0.9, 60 * u, '#fff', { weight: 900 });
   else if (joined) rich(ctx, ['Press ', { btn: 'A' }, ' when you\'re ready!'], W / 2, H * 0.9, 50 * u * pulse, '#fff');
   else rich(ctx, ['Press ', { btn: 'A' }, ' to join'], W / 2, H * 0.9, 54 * u * pulse, '#fff');
-  const rule = joined >= 3 ? '3–4 players: 2 of you will secretly be the Imposters!' : 'Everyone on the couch gets the same role: all Crewmates or all Imposters';
-  text(ctx, rule, W / 2, H * 0.965, 24 * u, 'rgba(201,209,224,0.8)', { weight: 600 });
+  const role = st.settings.role;
+  const rule = role === 'crew' ? 'Everyone on the couch is a Crewmate. Find the 2 Imposter bots!'
+    : role === 'imp' ? (joined >= 3 ? '2 of you will be the Imposters (only 2 per game), the rest Crewmates' : 'Everyone on the couch is an Imposter. Don\'t get caught!')
+    : joined >= 3 ? '3–4 players: 2 of you will secretly be the Imposters!' : 'Everyone on the couch gets the same role: all Crewmates or all Imposters';
+  const pcHint = st.settings.computer ? '   ·   Computer: WASD move, E use, Q kill, R report, Tab map, F sabotage, Esc close'
+    : '   ·   On a computer? Press C for computer controls';
+  text(ctx, rule + pcHint, W / 2, H * 0.965, 22 * u, 'rgba(201,209,224,0.8)', { weight: 600 });
+}
+
+function pickerPill(ctx, cx, cy, u, btn, options, selected, title) {
+  const ow = 215 * u, oh = 66 * u, pad = 8 * u, bw = 76 * u;
+  const w = options.length * ow + pad * 2 + bw;
+  const x = cx - w / 2;
+  panel(ctx, x, cy - oh / 2 - pad, w, oh + pad * 2, (oh + pad * 2) / 2, 'rgba(255,255,255,0.07)', 'rgba(255,255,255,0.15)', 2);
+  button(ctx, btn, x + pad + 34 * u, cy, 24 * u);
+  text(ctx, title, x + w / 2, cy - oh / 2 - pad - 16 * u, 18 * u, 'rgba(201,209,224,0.7)', { weight: 800 });
+  options.forEach((o, i) => {
+    const ox = x + pad + bw + i * ow;
+    if (i === selected) panel(ctx, ox, cy - oh / 2, ow - 6 * u, oh, oh / 2, 'rgba(255,255,255,0.92)');
+    const col = i === selected ? '#0b0e15' : 'rgba(220,228,240,0.6)';
+    text(ctx, o.icon, ox + 36 * u, cy + 2 * u, 30 * u, col);
+    text(ctx, o.label, ox + 62 * u, cy, 23 * u, col, { align: "left" });
+  });
 }
 
 function drawSlotCard(ctx, x, y, w, h, u, i, st) {
@@ -164,10 +191,10 @@ export function drawMap(ctx, view, game, viewer, mode, sel) {
       panel(ctx, bx, by, bw, bh, 14 * u, ready ? '#7a1010' : '#3a2020', i === sel ? '#ffd84a' : '#ff6b6b', (i === sel ? 5 : 2) * u);
       text(ctx, `${def.icon} ${def.name}`, bx + bw / 2, by + bh / 2, 26 * u, ready ? '#fff' : '#a88', { weight: 900 });
     });
-    text(ctx, ready ? 'SABOTAGE: ←/→ to choose, A to start, B to close' : game.sabotage ? 'A sabotage is already happening' : `Sabotage ready in ${Math.ceil(game.sabotageCd)}s`,
+    text(ctx, ready ? kbText('SABOTAGE: ←/→ to choose, A to start, B to close') : game.sabotage ? 'A sabotage is already happening' : `Sabotage ready in ${Math.ceil(game.sabotageCd)}s`,
       x + w / 2, y + h * 0.06, 24 * u, '#ff9a9a', { weight: 800, stroke: 4 * u });
   } else {
-    text(ctx, 'MAP  (B to close)', x + w / 2, y + h * 0.05, 24 * u, '#fff', { weight: 900, stroke: 4 * u });
+    text(ctx, kbText('MAP  (B to close)'), x + w / 2, y + h * 0.05, 24 * u, '#fff', { weight: 900, stroke: 4 * u });
   }
   ctx.restore();
 }
@@ -260,6 +287,7 @@ export function drawMeeting(ctx, W, H, game, humans) {
 
   // Each human's cursor, confirm prompt and chat menu.
   for (const h of humans) {
+    setGlyphs(h.keys ? 'keys' : 'pad');
     const ui = h.ui;
     if (!h.player.alive) {
       text(ctx, `P${h.player.slot + 1} is a ghost: watching`, L.px + L.pw - 30 * u, L.py + L.ph - 30 * u - h.player.slot * 30 * u, 20 * u, '#333', { align: 'right', weight: 700 });
@@ -276,6 +304,7 @@ export function drawMeeting(ctx, W, H, game, humans) {
     }
     if (ui.chat) drawChatMenu(ctx, game, h, L);
   }
+  setGlyphs(humans.some((h) => h.keys) ? 'keys' : 'pad');
   // Hint bar.
   if (m.phase !== 'results') rich(ctx, ['Stick: pick   ', { btn: 'A' }, ' vote   ', { btn: 'X' }, ' quick chat'], W / 2, L.py + L.ph + 34 * u > H ? H - 20 * u : L.py + L.ph + 34 * u, 26 * u, '#fff');
 }
@@ -306,7 +335,7 @@ function drawChatMenu(ctx, game, h, L) {
   const w = 420 * u, lh = 46 * u;
   const x = L.px + 30 * u + h.player.slot * (w + 10 * u), y = L.py + L.ph - opts.length * lh - 50 * u;
   panel(ctx, x, y - 50 * u, w, opts.length * lh + 64 * u, 16 * u, 'rgba(20,24,34,0.96)', SLOT_COLORS[h.player.slot], 4 * u);
-  text(ctx, `P${h.player.slot + 1} says…  (B close)`, x + w / 2, y - 24 * u, 22 * u, SLOT_COLORS[h.player.slot], { weight: 900 });
+  text(ctx, kbText(`P${h.player.slot + 1} says…  (B close)`), x + w / 2, y - 24 * u, 22 * u, SLOT_COLORS[h.player.slot], { weight: 900 });
   opts.forEach((o, i) => {
     if (i === h.ui.chatSel) panel(ctx, x + 8 * u, y + i * lh, w - 16 * u, lh - 4 * u, 10 * u, 'rgba(255,255,255,0.18)');
     text(ctx, o.text, x + 22 * u, y + i * lh + lh / 2, 22 * u, '#fff', { align: 'left', weight: 700 });

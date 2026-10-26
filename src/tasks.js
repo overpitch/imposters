@@ -2,7 +2,7 @@
 // Each mini-game: update(dt, inp) and draw(ctx, box). `done` when finished.
 // inp: { sx, sy, a, aP, bP, upP, downP, leftP, rightP }  (P = pressed this frame)
 
-import { text, panel } from './draw.js';
+import { text, panel, kbText } from './draw.js';
 
 const rand = (a, b) => a + Math.random() * (b - a);
 const shuffle = (a) => { for (let i = a.length - 1; i > 0; i--) { const j = (Math.random() * (i + 1)) | 0; [a[i], a[j]] = [a[j], a[i]]; } return a; };
@@ -22,7 +22,7 @@ class MiniGame {
     const { x, y, w, h } = box;
     panel(ctx, x, y, w, h, w * 0.03, '#1f242e', '#8a93a6', w * 0.008);
     text(ctx, this.title, x + w / 2, y + h * 0.055, w * 0.045, '#fff', { weight: 900 });
-    text(ctx, this.hint, x + w / 2, y + h * 0.955, w * 0.03, '#b8c0d0', { weight: 600 });
+    text(ctx, kbText(this.hint), x + w / 2, y + h * 0.955, w * 0.03, '#b8c0d0', { weight: 600 });
     return { x: x + w * 0.06, y: y + h * 0.11, w: w * 0.88, h: h * 0.78 };
   }
   overlay(ctx, box) {
@@ -555,7 +555,7 @@ class Reactor extends MiniGame { // two people must hold their hand scanners at 
       const sy = b.y + b.h * (0.12 + 0.55 * ((performance.now() / 500) % 1));
       ctx.fillStyle = 'rgba(95,212,255,0.6)'; ctx.fillRect(b.x + b.w * 0.25, sy, b.w * 0.5, b.h * 0.02);
     }
-    text(ctx, !this.holding ? 'Hold A' : other ? 'Both hands on! Keep holding…' : 'Waiting for second user…', b.x + b.w / 2, b.y + b.h * 0.85, b.w * 0.045, other ? '#5dff6a' : '#ffd84a', { weight: 800 });
+    text(ctx, !this.holding ? kbText('Hold A') : other ? 'Both hands on! Keep holding…' : 'Waiting for second user…', b.x + b.w / 2, b.y + b.h * 0.85, b.w * 0.045, other ? '#5dff6a' : '#ffd84a', { weight: 800 });
     this.overlay(ctx, box);
   }
 }

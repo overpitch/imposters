@@ -4,7 +4,7 @@ An Among Us-style social deduction game: 8 players on a spaceship, 2 of them sec
 Played on one TV in Microsoft Edge on an Xbox, with 1–4 local players in split screen and bots
 filling the rest of the crew.
 
-*Decisions from the request and Q&A, 2026-10-23.*
+*Decisions from the request and Q&A, 2026-10-23; feedback round 2026-10-26.*
 
 ---
 
@@ -21,6 +21,9 @@ filling the rest of the crew.
 | Kills | Like the original: cartoon, the victim's bottom half is left behind with a bone; a short kill cut-in on the victim's screen |
 | Meetings | Quick-chat phrases with the controller; bots accuse, defend and vote based on what they saw |
 | Faithfulness | Gameplay as close to Among Us as possible; original name, map and character art |
+| Role setting | Lobby: Random / Crewmate / Imposter for the humans (3–4 humans: at most 2 Imposters) |
+| Computer controls | Lobby setting: one keyboard player with PC keys (WASD, E use, Q kill, R report, Tab map, F sabotage, Esc); hints show key caps |
+| Meeting types | Bots know a body report from an emergency meeting: reporters say where the body was; at emergencies they ask the caller why and nobody asks "where?" |
 
 ## Gameplay (same rules as the original)
 

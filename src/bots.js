@@ -392,12 +392,18 @@ export function onMeeting(game) {
     const t0 = 2.8; // after the intro splash
     const at = () => t0 + 0.4 + Math.random() ** 1.6 * talkEnd; // most chatter early, like real players
 
+    const emergency = !m.body;
     if (m.caller === p) {
-      if (m.body) queue(b, t0 + 0.3, `${m.body.name} was dead in ${m.bodyRoom}.`, null);
+      if (!emergency) queue(b, t0 + 0.3, `I found ${m.body.name}'s body in ${m.bodyRoom}.`, null);
       else if (b.sawVent !== undefined && game.players[b.sawVent].alive) {
         const v = game.players[b.sawVent];
-        queue(b, t0 + 0.3, `I saw ${v.name} vent!`, { kind: 'vent', target: v.id });
-      } else queue(b, t0 + 0.3, 'I called this meeting.', null);
+        queue(b, t0 + 0.3, `Emergency! I saw ${v.name} vent!`, { kind: 'vent', target: v.id });
+      } else if (p.role === 'imp') {
+        queue(b, t0 + 0.3, pick(['I called it because something felt off.', 'Just checking in. Anyone seen anything?']), null);
+      } else queue(b, t0 + 0.3, 'I called this meeting. Does anyone have info?', null);
+    } else if (emergency && m.caller && Math.random() < 0.6) {
+      // Nobody found a body: ask the caller why.
+      queue(b, t0 + rand(0.4, 2.5), pick([`Why did ${m.caller.name} call a meeting?`, `What's the emergency, ${m.caller.name}?`, 'Why the meeting?', 'Did someone see something?']), null);
     }
     if (p.role === 'crew') {
       let said = false;
@@ -428,19 +434,24 @@ export function onMeeting(game) {
         if (top && (b.sus.get(top.id) ?? 0) >= 80) queue(b, at(), `${top.name} is sus.`, { kind: 'sus', target: top.id });
         else queue(b, at(), pick(m.caller === p
           ? [`I was in ${ROOM_OF(game, p)} doing tasks.`, 'I have no info.']
-          : [`I was in ${ROOM_OF(game, p)} doing tasks.`, 'Where?', 'Who?', 'I have no info.', 'I was doing tasks.']), null);
+          : emergency
+            ? [`I was in ${ROOM_OF(game, p)} doing tasks.`, 'I haven\'t seen anything weird.', 'Skip unless someone saw something.', 'I have no info.']
+            : [`I was in ${ROOM_OF(game, p)} doing tasks.`, 'Where?', 'Who?', 'I have no info.', 'I was doing tasks.']), null);
       }
       for (const id of b.cleared) {
         if (game.players[id].alive && Math.random() < 0.5) queue(b, at(), `${game.players[id].name} scanned, they're safe.`, { kind: 'safe', target: id });
       }
     } else {
       // Imposter: alibi, maybe frame someone.
-      queue(b, at(), pick([`I was in ${ROOM_OF(game, p)}.`, `I was doing ${b.lastTask?.name ?? 'tasks'}.`, 'Where was the body?']), null);
+      queue(b, at(), pick(emergency
+        ? [`I was in ${ROOM_OF(game, p)}.`, `I was doing ${b.lastTask?.name ?? 'tasks'}.`, 'Why are we here?']
+        : [`I was in ${ROOM_OF(game, p)}.`, `I was doing ${b.lastTask?.name ?? 'tasks'}.`, 'Where was the body?']), null);
       if (Math.random() < 0.45) {
         const victims = game.players.filter((o) => o.alive && o.role === 'crew');
         if (victims.length) {
           const v = pick(victims);
-          queue(b, at(), Math.random() < 0.5 ? `${v.name} is sus.` : `I saw ${v.name} near ${m.bodyRoom ?? 'Electrical'}.`, { kind: 'sus', target: v.id });
+          const lie = emergency ? `${v.name} has been acting weird.` : `I saw ${v.name} near ${m.bodyRoom}.`;
+          queue(b, at(), Math.random() < 0.5 ? `${v.name} is sus.` : lie, { kind: 'sus', target: v.id });
         }
       }
     }

@@ -13,6 +13,27 @@ crew to 8. Made to play in Microsoft Edge on an Xbox with controllers. See [DESI
    stick moves a mouse pointer and the game can't see the controller.)
 3. Each player presses **A** to join, picks a color with the stick, and presses **A** again when ready.
 
+**Lobby settings** (anyone can change them; they're remembered on that device):
+- **X: Controls**: Xbox or Computer (see below).
+- **Y: Role**: Random, Crewmate or Imposter. With 3–4 players only 2 can be Imposters.
+
+## Playing on a computer
+
+Press **C** in the lobby (or pick *Computer* under Controls). One keyboard player, PC-style:
+
+| Key | Does |
+|---|---|
+| WASD / arrows | Move (and menus) |
+| E / Space / Enter | Use, join, ready, vote |
+| Q | Kill (Imposters) · quick chat in meetings |
+| R | Report a body |
+| Tab / M | Map |
+| F | Sabotage menu (Imposters) |
+| Esc / Backspace | Close |
+
+Controllers can still join alongside the keyboard player. Button hints switch to key caps for
+the keyboard player.
+
 ## Controls
 
 | Button | Does |
@@ -34,8 +55,9 @@ The game never needs ☰ or View, because Edge on Xbox keeps those buttons for i
 python3 serve.py 8090
 ```
 
-Then open http://localhost:8090. Keyboard for testing: P1 = WASD + Space (A), Q (B), E (X kill),
-R (Y report), G (LB map), F (RB sabotage). P2 = arrows + Enter (A), Backspace (B), / (X), . (Y), M (LB), , (RB).
+Then go to http://localhost:8090. With computer controls off, the keyboard is split into two test
+players: P1 = WASD + Space (A), Q (B), E (X), R (Y), G (LB), F (RB); P2 = arrows + Enter (A),
+Backspace (B), / (X), . (Y), M (LB), , (RB).
 
 **Xbox simulator:** http://localhost:8090/xbox.html runs the game on a pretend TV with four virtual
 Xbox controllers that behave like Edge on Xbox (browsing vs. game controls, ☰ and View kept by
@@ -46,7 +68,8 @@ Edge). Controllers 1–2 have keyboard keys (shown on screen); all four are scri
 
 Plain JavaScript modules, no build step, no dependencies.
 
-- `src/config.js`: settings (cooldowns, vision, timers), colors
+- `src/config.js`: game settings (cooldowns, vision, timers), colors
+- `src/settings.js`: lobby settings (controls, role), remembered in the browser
 - `src/map.js`: the ship (rooms, halls, furniture, consoles, vents, tasks, sabotages), collision, vision, path-finding
 - `src/game.js`: rules: roles, kills, bodies, meetings, voting, ejection, sabotage, win conditions
 - `src/bots.js`: bot crewmates and Imposters (perception, tasks, hunting, witnessing, meetings, voting)

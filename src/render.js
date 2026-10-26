@@ -2,7 +2,7 @@
 
 import { SETTINGS as S } from './config.js';
 import { ROOMS, HALLS, FURNITURE, STATIONS, VENTS, SABOTAGES, WORLD } from './map.js';
-import { text, panel, button, drawCrew, drawGhost, drawBody, FONT } from './draw.js';
+import { text, panel, button, rich, drawCrew, drawGhost, drawBody } from './draw.js';
 
 const TAU = Math.PI * 2;
 const WALL = 26;
@@ -304,7 +304,7 @@ export function drawHud(ctx, game, view, viewer, ui) {
   // Action buttons.
   drawButtons(ctx, game, view, viewer, u);
 
-  if (viewer.vent) rich(ctx, ['Stick: next vent   ', { btn: 'A' }, ' climb out'], x + w / 2, y + h - 40 * u, 20 * u, '#fff');
+  if (viewer.vent) rich(ctx, ['Stick: next vent   ', { btn: 'A' }, ' climb out'], x + w / 2, y + h - 40 * u, 20 * u, '#fff', true);
   ctx.restore();
 }
 
@@ -366,18 +366,6 @@ function drawButtons(ctx, game, view, viewer, u) {
     bx -= s + gap;
   }
   actionButton(ctx, x + 30 * u + s / 2, by, s, 'MAP', 'LB', true, '🗺️');
-}
-
-function rich(ctx, parts, cx, cy, size, color) {
-  ctx.font = `800 ${size}px ${FONT}`;
-  const br = size * 0.6, gap = size * 0.25;
-  const widths = parts.map((p) => (typeof p === 'string' ? ctx.measureText(p).width : br * 2 + gap * 2));
-  let px = cx - widths.reduce((a, b) => a + b, 0) / 2;
-  parts.forEach((p, i) => {
-    if (typeof p === 'string') text(ctx, p, px, cy, size, color, { align: 'left', stroke: size * 0.2 });
-    else button(ctx, p.btn, px + gap + br, cy, br);
-    px += widths[i];
-  });
 }
 
 // ---------------------------------------------------------------------------

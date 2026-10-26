@@ -23,10 +23,50 @@ export function panel(ctx, x, y, w, h, r, fill, border, lw = 2) {
   if (border) { ctx.strokeStyle = border; ctx.lineWidth = lw; ctx.stroke(); }
 }
 
+// Button hints show Xbox buttons, or keyboard keys for a player on computer controls.
+let glyphs = 'pad';
+export function setGlyphs(mode) { glyphs = mode; }
+export const usingKeys = () => glyphs === 'keys';
+const KEYCAP = { A: 'E', B: 'Esc', X: 'Q', Y: 'R', LB: 'Tab', RB: 'F', menu: 'Esc' };
+
+/** Swap controller wording for keyboard wording when showing keys. */
+export function kbText(s) {
+  if (glyphs !== 'keys') return s;
+  return s
+    .replace('Push the stick up on the glowing slider', 'Hold W on the glowing slider')
+    .replace('Hold the stick down to pull the lever', 'Hold S to pull the lever')
+    .replace('Push the stick from left to right at a steady speed', 'Hold A, then hold D: swipe at a steady speed')
+    .replace('Move the stick up/down to line it up', 'Use W/S to line it up')
+    .replace(/[Tt]he stick/g, 'WASD').replace(/Stick:/g, 'WASD:').replace(/stick/g, 'WASD')
+    .replace(/↕ \+ A/g, 'W/S + E').replace(/←\/→/g, 'A/D').replace(/↑\/↓|up\/down/g, 'W/S')
+    .replace(/\bHold A\b/g, 'Hold E').replace(/\bPress A\b/g, 'Press E').replace(/\bA when\b/g, 'E when').replace(/\bA to\b/g, 'E to').replace(/\bA on\b/g, 'E on').replace(/, A\b/g, ', E')
+    .replace(/\bB to\b/g, 'Esc to').replace(/\(B close\)/g, '(Esc close)').replace(/\bB close\b/g, 'Esc close');
+}
+
+function glyphWidth(ctx, label, r) {
+  if (glyphs === 'keys' && KEYCAP[label]) {
+    ctx.font = `900 ${r * 1.05}px ${FONT}`;
+    return Math.max(r * 2, ctx.measureText(KEYCAP[label]).width + r * 1.1);
+  }
+  return label === 'LB' || label === 'RB' ? r * 2.8 : r * 2;
+}
+
+function keycap(ctx, key, x, y, r) {
+  ctx.font = `900 ${r * 1.05}px ${FONT}`;
+  const w = Math.max(r * 2, ctx.measureText(key).width + r * 1.1), h = r * 1.9;
+  ctx.beginPath(); ctx.roundRect(x - w / 2, y - h / 2 + r * 0.12, w, h, r * 0.35);
+  ctx.fillStyle = '#9aa1ad'; ctx.fill();
+  ctx.beginPath(); ctx.roundRect(x - w / 2, y - h / 2, w, h - r * 0.18, r * 0.35);
+  ctx.fillStyle = '#f2f4f7'; ctx.fill();
+  ctx.strokeStyle = '#555c68'; ctx.lineWidth = Math.max(1, r * 0.08); ctx.stroke();
+  text(ctx, key, x, y - r * 0.06, r * 1.05, '#20242c', { weight: 900 });
+}
+
 const BTN = { A: '#3fbf3f', B: '#e04848', X: '#3a7be0', Y: '#f0c020', LB: '#5a6170', RB: '#5a6170', menu: '#5a6170' };
 
 /** An Xbox button glyph. */
 export function button(ctx, label, x, y, r) {
+  if (glyphs === 'keys' && KEYCAP[label]) { keycap(ctx, KEYCAP[label], x, y, r); return; }
   const wide = label === 'LB' || label === 'RB';
   ctx.beginPath();
   if (wide) ctx.roundRect(x - r * 1.4, y - r * 0.75, r * 2.8, r * 1.5, r * 0.5);
@@ -45,13 +85,18 @@ export function button(ctx, label, x, y, r) {
 }
 
 /** Text with inline button glyphs, centered. parts: string | { btn } */
-export function rich(ctx, parts, cx, cy, size, color) {
+export function rich(ctx, parts, cx, cy, size, color, stroke = false) {
   ctx.font = `800 ${size}px ${FONT}`;
   const br = size * 0.6, gap = size * 0.25;
-  const widths = parts.map((p) => (typeof p === 'string' ? ctx.measureText(p).width : (p.btn.length > 1 && p.btn !== 'menu' ? br * 2.8 : br * 2) + gap * 2));
+  parts = parts.map((p) => (typeof p === 'string' ? kbText(p) : p));
+  const widths = parts.map((p) => {
+    if (typeof p !== 'string') return glyphWidth(ctx, p.btn, br) + gap * 2;
+    ctx.font = `800 ${size}px ${FONT}`;
+    return ctx.measureText(p).width;
+  });
   let x = cx - widths.reduce((a, b) => a + b, 0) / 2;
   parts.forEach((p, i) => {
-    if (typeof p === 'string') text(ctx, p, x, cy, size, color, { align: 'left' });
+    if (typeof p === 'string') text(ctx, p, x, cy, size, color, { align: 'left', stroke: stroke ? size * 0.2 : 0 });
     else button(ctx, p.btn, x + widths[i] / 2, cy, br);
     x += widths[i];
   });

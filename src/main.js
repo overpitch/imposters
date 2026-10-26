@@ -5,7 +5,8 @@ import { Input } from './input.js';
 import { drawWorld, drawHud, drawKillSplash } from './render.js';
 import { drawLobby, drawReveal, drawMap, drawMeeting, drawEject, drawOver, drawControllerHelp, chatOptions } from './ui.js';
 import { makeMiniGame } from './tasks.js';
-import { text } from './draw.js';
+import { text, setGlyphs } from './draw.js';
+import { settings, saveSettings, ROLE_CHOICES } from './settings.js';
 import { sfx } from './audio.js';
 
 const canvas = document.getElementById('game');
@@ -62,7 +63,16 @@ function freeColor(from, dir, mine) {
   return from;
 }
 
+function setComputer(on) {
+  settings.computer = on;
+  saveSettings();
+  // The arrow-keys player only exists without computer controls.
+  if (on) for (let i = 0; i < slots.length; i++) if (slots[i]?.device === 'kb2') slots[i] = null;
+  sfx('blip');
+}
+
 function updateLobby() {
+  if (input.keysPressed?.has('KeyC')) setComputer(!settings.computer);
   const owners = slots.filter(Boolean);
   trackMissing(owners, (s) => s.device);
   const taken = slots.includes(null) ? [] : takeOver(owners, (s) => s.device, (s, id) => { s.device = id; });
@@ -89,6 +99,13 @@ function updateLobby() {
     }
     if (input.pressed(id, 'a')) { s.ready = !s.ready; sfx('blip'); }
   }
+  // Settings: anyone (joined or not) can change them.
+  if (input.ids().some((id) => input.pressed(id, 'x'))) setComputer(!settings.computer);
+  if (input.ids().some((id) => input.pressed(id, 'y'))) {
+    settings.role = ROLE_CHOICES[(ROLE_CHOICES.indexOf(settings.role) + 1) % ROLE_CHOICES.length];
+    saveSettings();
+    sfx('blip');
+  }
   const joined = slots.filter(Boolean);
   const now = performance.now() / 1000;
   if (!joined.length || !joined.every((s) => s.ready)) startAt = null;
@@ -98,7 +115,7 @@ function updateLobby() {
 
 function startGame() {
   const list = slots.map((s, i) => (s ? { slot: i, device: s.device, color: s.color } : null)).filter(Boolean);
-  game = new Game(map, list);
+  game = new Game(map, list, { role: settings.role });
   humans = game.players.filter((p) => p.human).map((player) => ({ player, ui: newUi(player) }));
   screen = 'game';
   sfx('meeting');
@@ -124,10 +141,21 @@ function toLobby() {
 // ---------------------------------------------------------------------------
 // Playing
 
-function miniInput(id) {
+const keySmooth = new Map();
+function miniInput(id, dt) {
   const st = input.state(id) ?? {};
+  let sx = st.stickX ?? 0, sy = st.stickY ?? 0;
+  if (input.isKeyboard(id)) {
+    // Keys are all-or-nothing; ease them so stick-style tasks (like swiping a card) work.
+    const s = keySmooth.get(id) ?? { x: 0, y: 0 };
+    const k = 2.4 * dt;
+    s.x += Math.max(-k, Math.min(k, sx - s.x));
+    s.y += Math.max(-k, Math.min(k, sy - s.y));
+    keySmooth.set(id, s);
+    sx = s.x; sy = s.y;
+  }
   return {
-    sx: st.stickX ?? 0, sy: st.stickY ?? 0, a: !!st.a,
+    sx, sy, a: !!st.a,
     aP: input.pressed(id, 'a'), bP: input.pressed(id, 'b'),
     upP: input.pressed(id, 'up'), downP: input.pressed(id, 'down'), leftP: input.pressed(id, 'left'), rightP: input.pressed(id, 'right'),
   };
@@ -154,7 +182,7 @@ function updateHuman(h, dt) {
     const use = ui.miniUse;
     // A sabotage fix that got fixed by someone else (or ended) closes itself.
     if (use.kind === 'fix' && (!game.sabotage || game.sabotage.fixed.has(use.station)) && !ui.mini.done) { closeMini(h); return; }
-    const inp = miniInput(id);
+    const inp = miniInput(id, dt);
     ui.mini.tick(dt, inp);
     if (ui.mini.done) {
       if (!ui.mini.finished) {
@@ -328,12 +356,17 @@ function render(dt) {
   ctx.fillRect(0, 0, W, H);
   const u = Math.min(W / 1920, H / 1080);
 
+  const keysFor = (p) => settings.computer && input.isKeyboard(p.device);
+  for (const h of humans) h.keys = keysFor(h.player);
+  setGlyphs(settings.computer && (screen === 'lobby' || humans.some((h) => h.keys)) ? 'keys' : 'pad');
+
   if (screen === 'lobby') {
     drawLobby(ctx, W, H, {
+      settings,
       t: performance.now() / 1000, slots,
       countdown: startAt === null ? null : Math.max(0, startAt - performance.now() / 1000),
       deviceLabel: (id) => input.label(id),
-      needHelp: input.browsingMode() || slots.some((s) => s && !input.state(s.device)) || (input.padCount() === 0 && !slots.some(Boolean)),
+      needHelp: !settings.computer && (input.browsingMode() || slots.some((s) => s && !input.state(s.device)) || (input.padCount() === 0 && !slots.some(Boolean))),
     });
     return;
   }
@@ -345,6 +378,7 @@ function render(dt) {
   const vs = views(humans.length);
   humans.forEach((h, i) => {
     const view = vs[i], p = h.player, ui = h.ui;
+    setGlyphs(h.keys ? 'keys' : 'pad');
     if (game.state === 'reveal') { drawReveal(ctx, view, game, p, game.stateTime / 5); return; }
     updateCam(ui, p, view, dt);
     drawWorld(ctx, game, view, ui.cam, p, { ventSel: ui.ventSel });

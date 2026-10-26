@@ -5,6 +5,8 @@
 // The game needs Edge's "Use game controls" mode; in browsing mode the stick moves a pointer,
 // which we only watch for so we can tell the player how to switch.
 
+import { settings } from './settings.js';
+
 // Legacy Edge on Xbox: opt the page out of mouse emulation where that switch exists.
 try { navigator.gamepadInputEmulation = 'gamepad'; } catch { /* not supported */ }
 
@@ -35,6 +37,10 @@ const KEYMAP = {
     x: ['KeyE'], y: ['KeyR'], lb: ['KeyG'], rb: ['KeyF'], menu: ['Escape'], view: [] },
   kb2: { left: ['ArrowLeft'], right: ['ArrowRight'], up: ['ArrowUp'], down: ['ArrowDown'], a: ['Enter'], b: ['Backspace'],
     x: ['Slash'], y: ['Period'], lb: ['KeyM'], rb: ['Comma'], menu: ['Escape'], view: [] },
+  // "Computer controls" (lobby setting): one keyboard player, PC-style keys.
+  pc: { left: ['KeyA', 'ArrowLeft'], right: ['KeyD', 'ArrowRight'], up: ['KeyW', 'ArrowUp'], down: ['KeyS', 'ArrowDown'],
+    a: ['KeyE', 'Space', 'Enter'], b: ['Escape', 'Backspace'], x: ['KeyQ'], y: ['KeyR'], lb: ['Tab', 'KeyM'], rb: ['KeyF'],
+    menu: [], view: [] },
   xkeys: {
     left: ['GamepadDPadLeft', 'GamepadLeftThumbstickLeft'], right: ['GamepadDPadRight', 'GamepadLeftThumbstickRight'],
     up: ['GamepadDPadUp', 'GamepadLeftThumbstickUp'], down: ['GamepadDPadDown', 'GamepadLeftThumbstickDown'],
@@ -104,7 +110,8 @@ export class Input {
     }
     const havePads = this.cur.size > 0;
 
-    for (const [id, map] of Object.entries(KEYMAP)) {
+    const keyboards = settings.computer ? [['kb1', KEYMAP.pc]] : [['kb1', KEYMAP.kb1], ['kb2', KEYMAP.kb2]];
+    for (const [id, map] of [...keyboards, ['xkeys', KEYMAP.xkeys]]) {
       // Controller-buttons-as-keys only when the Gamepad API isn't already giving us the pads
       // (otherwise one press would count as two players).
       if (id === 'xkeys' && (!xkeysSeen || havePads)) continue;
@@ -118,6 +125,7 @@ export class Input {
         left: k('left'), right: k('right'), up: k('up'), down: k('down'),
       });
     }
+    this.keysPressed = new Set(tapped); // raw key codes pressed this frame
     tapped.clear();
 
     this.back = backPresses > 0;
@@ -132,7 +140,10 @@ export class Input {
   pressed(id, button) { return !!this.cur.get(id)?.[button] && !this.prev.get(id)?.[button]; }
   held(id, button) { return !!this.cur.get(id)?.[button]; }
 
+  isKeyboard(id) { return id === 'kb1' || id === 'kb2'; }
+
   label(id) {
+    if (id === 'kb1' && settings.computer) return 'Keyboard';
     if (id === 'kb1') return 'Keyboard (WASD)';
     if (id === 'kb2') return 'Keyboard (arrows)';
     if (id === 'xkeys') return 'Controller';

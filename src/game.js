@@ -9,8 +9,10 @@ const pick = (a) => a[(Math.random() * a.length) | 0];
 
 export class Game {
   /** humans: [{ slot, device, color }] (color = index into COLORS) */
-  constructor(map, humans) {
+  /** opts.role: 'random' | 'crew' | 'imp' (lobby setting for the humans' role) */
+  constructor(map, humans, opts = {}) {
     this.map = map;
+    this.roleChoice = opts.role ?? 'random';
     this.time = 0;
     this.state = 'reveal';       // reveal | play | meeting | eject | over
     this.stateTime = 0;
@@ -59,9 +61,12 @@ export class Game {
     const humans = this.players.filter((p) => p.human);
     const bots = this.players.filter((p) => !p.human);
     let imps = [];
-    if (humans.length >= 3) {
-      imps = shuffle([...humans]).slice(0, S.impostors);             // split teams
-    } else if (humans.length && Math.random() < S.humanImpostorChance) {
+    const choice = this.roleChoice;
+    if (choice === 'crew' || !humans.length) {
+      imps = shuffle([...bots]).slice(0, S.impostors);               // every human is crew
+    } else if (humans.length >= 3) {
+      imps = shuffle([...humans]).slice(0, S.impostors);             // split teams (only 2 Imposters per game)
+    } else if (choice === 'imp' || Math.random() < S.humanImpostorChance) {
       imps = [...humans, ...shuffle([...bots]).slice(0, S.impostors - humans.length)]; // humans share Imposter
     } else {
       imps = shuffle([...bots]).slice(0, S.impostors);               // humans share Crewmate
