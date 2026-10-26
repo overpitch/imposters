@@ -202,12 +202,14 @@ export function drawMap(ctx, view, game, viewer, mode, sel) {
 // ---------------------------------------------------------------------------
 // Meeting
 
-export const CHAT_GENERAL = ['Where?', 'Who?', 'I was doing tasks.', 'I don\'t know.', 'Skip this one.'];
-export const CHAT_ABOUT = [
-  { text: (n) => `${n} is sus.`, kind: 'sus' },
-  { text: (n) => `I saw ${n} vent!`, kind: 'vent' },
-  { text: (n) => `I saw ${n} kill!`, kind: 'kill' },
-  { text: (n) => `${n} is safe.`, kind: 'safe' },
+/** On-screen keyboard for typing with a controller. Color names type the whole word. */
+export const OSK_ROWS = [
+  ['Red', 'Blue', 'Green', 'Pink', 'Orange', 'Yellow'],
+  ['Black', 'White', 'Purple', 'Brown', 'Cyan', 'Lime'],
+  ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'],
+  ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L', '?'],
+  ['Z', 'X', 'C', 'V', 'B', 'N', 'M', '!', '.', '⌫'],
+  ['SPACE', 'SEND'],
 ];
 
 export function meetingLayout(W, H) {
@@ -282,7 +284,7 @@ export function drawMeeting(ctx, W, H, game, humans) {
     const ly = L.chat.y + 20 * u + i * lineH;
     drawCrew(ctx, L.chat.x + 30 * u, ly + 44 * u, 44 * u, c.from.color, { shadow: false });
     text(ctx, c.from.human ? `${c.from.name} (P${c.from.slot + 1})` : c.from.name, L.chat.x + 60 * u, ly + 12 * u, 17 * u, '#555', { align: 'left', weight: 800 });
-    text(ctx, c.text, L.chat.x + 60 * u, ly + 34 * u, 23 * u, '#111', { align: 'left', weight: 700 });
+    fitText(ctx, c.text, L.chat.x + 60 * u, ly + 34 * u, 23 * u, L.chat.w - 75 * u);
   });
 
   // Each human's cursor, confirm prompt and chat menu.
@@ -302,11 +304,13 @@ export function drawMeeting(ctx, W, H, game, humans) {
     if (ui.confirm && !m.votes.has(h.player.id)) {
       rich(ctx, [{ btn: 'A' }, ' vote  ', { btn: 'B' }, ' cancel'], box.x + box.w - 140 * u, box.y + box.h - 26 * u, 22 * u, '#111');
     }
-    if (ui.chat) drawChatMenu(ctx, game, h, L);
   }
+  // Chat boxes (side by side if several people are typing at once).
+  const typers = humans.filter((h) => h.ui.typing && h.player.alive);
+  typers.forEach((h, i) => { setGlyphs(h.keys ? 'keys' : 'pad'); drawChatBox(ctx, h, L, i, typers.length); });
   setGlyphs(humans.some((h) => h.keys) ? 'keys' : 'pad');
   // Hint bar.
-  if (m.phase !== 'results') rich(ctx, ['Stick: pick   ', { btn: 'A' }, ' vote   ', { btn: 'X' }, ' quick chat'], W / 2, L.py + L.ph + 34 * u > H ? H - 20 * u : L.py + L.ph + 34 * u, 26 * u, '#fff');
+  if (m.phase !== 'results') rich(ctx, ['Stick: pick   ', { btn: 'A' }, ' vote   ', { btn: 'X' }, ' type a message'], W / 2, L.py + L.ph + 34 * u > H ? H - 20 * u : L.py + L.ph + 34 * u, 26 * u, '#fff');
 }
 
 function drawVoters(ctx, game, target, x, y, u) {
@@ -321,25 +325,57 @@ function drawVoters(ctx, game, target, x, y, u) {
   }
 }
 
-export function chatOptions(game, h) {
-  const target = h.ui.cursor < 8 ? game.players[h.ui.cursor] : null;
-  const opts = [];
-  if (target && target !== h.player && target.alive) for (const c of CHAT_ABOUT) opts.push({ text: c.text(target.name), meta: { kind: c.kind, target: target.id } });
-  for (const g of CHAT_GENERAL) opts.push({ text: g, meta: null });
-  return opts;
+function fitText(ctx, str, x, y, size, maxW) {
+  ctx.font = `700 ${size}px system-ui, "Segoe UI", sans-serif`;
+  let s = size, w = ctx.measureText(str).width;
+  if (w > maxW) { s = Math.max(size * 0.65, size * (maxW / w)); }
+  ctx.font = `700 ${s}px system-ui, "Segoe UI", sans-serif`;
+  let out = str;
+  while (out.length > 1 && ctx.measureText(out).width > maxW) out = out.slice(0, -2) + '…';
+  text(ctx, out, x, y, s, '#111', { align: 'left', weight: 700 });
 }
 
-function drawChatMenu(ctx, game, h, L) {
+function drawChatBox(ctx, h, L, index, count) {
   const { u } = L;
-  const opts = chatOptions(game, h);
-  const w = 420 * u, lh = 46 * u;
-  const x = L.px + 30 * u + h.player.slot * (w + 10 * u), y = L.py + L.ph - opts.length * lh - 50 * u;
-  panel(ctx, x, y - 50 * u, w, opts.length * lh + 64 * u, 16 * u, 'rgba(20,24,34,0.96)', SLOT_COLORS[h.player.slot], 4 * u);
-  text(ctx, kbText(`P${h.player.slot + 1} says…  (B close)`), x + w / 2, y - 24 * u, 22 * u, SLOT_COLORS[h.player.slot], { weight: 900 });
-  opts.forEach((o, i) => {
-    if (i === h.ui.chatSel) panel(ctx, x + 8 * u, y + i * lh, w - 16 * u, lh - 4 * u, 10 * u, 'rgba(255,255,255,0.18)');
-    text(ctx, o.text, x + 22 * u, y + i * lh + lh / 2, 22 * u, '#fff', { align: 'left', weight: 700 });
+  const ui = h.ui, accent = SLOT_COLORS[h.player.slot];
+  const onScreenKeys = !h.keys; // controller players get the on-screen keyboard
+  const total = L.pw - 60 * u;
+  const w = total / count - (count > 1 ? 12 * u : 0);
+  const x = L.px + 30 * u + index * (total / count);
+  const keyH = 50 * u, fieldH = 60 * u;
+  const h_ = fieldH + 50 * u + (onScreenKeys ? OSK_ROWS.length * keyH + 46 * u : 0);
+  const y = L.py + L.ph - h_ - 20 * u;
+  panel(ctx, x, y, w, h_, 18 * u, 'rgba(20,24,34,0.97)', accent, 4 * u);
+  text(ctx, `P${h.player.slot + 1} (${h.player.name})`, x + 20 * u, y + 24 * u, 20 * u, accent, { align: 'left', weight: 900 });
+  // Text field with a blinking caret.
+  panel(ctx, x + 14 * u, y + 44 * u, w - 28 * u, fieldH, 10 * u, '#f4f6fa');
+  const caret = Math.sin(performance.now() / 180) > 0 ? '|' : '';
+  const shown = ui.typing.text || '';
+  ctx.save(); ctx.beginPath(); ctx.rect(x + 14 * u, y + 44 * u, w - 28 * u, fieldH); ctx.clip();
+  ctx.font = `700 ${26 * u}px system-ui, "Segoe UI", sans-serif`;
+  const tw = ctx.measureText(shown + '|').width, room = w - 56 * u;
+  text(ctx, shown + caret, x + 28 * u - Math.max(0, tw - room), y + 44 * u + fieldH / 2, 26 * u, shown ? '#111' : '#777', { align: 'left', weight: 700 });
+  ctx.restore();
+  if (!shown && !caret) text(ctx, 'Type a message…', x + 28 * u, y + 44 * u + fieldH / 2, 24 * u, '#999', { align: 'left', weight: 600 });
+
+  if (!onScreenKeys) {
+    text(ctx, 'Type, then Enter to send · Esc to cancel', x + w / 2, y + h_ - 22 * u, 20 * u, '#c9d1e0', { weight: 700 });
+    return;
+  }
+  // On-screen keyboard.
+  const ky = y + 44 * u + fieldH + 12 * u;
+  OSK_ROWS.forEach((row, r) => {
+    const kw = (w - 28 * u) / row.length;
+    row.forEach((k, c) => {
+      const kx = x + 14 * u + c * kw, kyy = ky + r * keyH;
+      const sel = ui.typing.osk.r === r && ui.typing.osk.c === c;
+      const special = k === 'SEND' ? '#2f8f3a' : r < 2 ? '#2b3446' : '#3a4150';
+      panel(ctx, kx + 3 * u, kyy + 3 * u, kw - 6 * u, keyH - 6 * u, 8 * u, sel ? '#ffd84a' : special, sel ? '#fff' : null, 3 * u);
+      const label = k === 'SPACE' ? 'space' : k === '⌫' ? 'DEL' : k;
+      text(ctx, label, kx + kw / 2, kyy + keyH / 2, (r < 2 ? 19 : 22) * u, sel ? '#111' : '#fff', { weight: 800 });
+    });
   });
+  rich(ctx, [{ btn: 'A' }, ' type  ', { btn: 'B' }, ' delete  ', { btn: 'Y' }, ' send'], x + w / 2, y + h_ - 22 * u, 20 * u, '#c9d1e0');
 }
 
 // ---------------------------------------------------------------------------

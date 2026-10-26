@@ -19,7 +19,7 @@ filling the rest of the crew.
 | Roles, 3–4 humans | 2 of the humans are the Imposters, the rest are crewmates; all bots are crew |
 | Name | **Imposters** |
 | Kills | Like the original: cartoon, the victim's bottom half is left behind with a bone; a short kill cut-in on the victim's screen |
-| Meetings | Quick-chat phrases with the controller; bots accuse, defend and vote based on what they saw |
+| Meetings | Free-typed chat: on-screen keyboard with a controller (plus whole-word color keys), real keyboard on a computer. Bots read color names + words like vent/kill/sus/safe/not, answer "where?", and accuse, defend and vote based on what they saw |
 | Faithfulness | Gameplay as close to Among Us as possible; original name, map and character art |
 | Role setting | Lobby: Random / Crewmate / Imposter for the humans (3–4 humans: at most 2 Imposters) |
 | Computer controls | Lobby setting: one keyboard player with PC keys (WASD, E use, Q kill, R report, Tab map, F sabotage, Esc); hints show key caps |

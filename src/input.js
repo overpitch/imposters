@@ -21,7 +21,20 @@ function keyName(e) {
   if (e.key && e.key.startsWith('Gamepad')) { xkeysSeen = true; return e.key; }
   return e.code;
 }
+// ---- Typing (meeting chat on a keyboard): while active, keys type text instead of playing.
+export const typing = { active: false, text: '', submit: false, cancel: false };
+export function startTyping() { typing.active = true; typing.text = ''; typing.submit = false; typing.cancel = false; keys.clear(); }
+export function stopTyping() { typing.active = false; typing.submit = false; typing.cancel = false; }
+
 addEventListener('keydown', (e) => {
+  if (typing.active && !(e.key || '').startsWith('Gamepad')) {
+    e.preventDefault();
+    if (e.key === 'Enter') typing.submit = true;
+    else if (e.key === 'Escape') typing.cancel = true;
+    else if (e.key === 'Backspace') typing.text = typing.text.slice(0, -1);
+    else if (e.key.length === 1 && typing.text.length < 70) typing.text += e.key;
+    return;
+  }
   const k = keyName(e);
   keys.add(k);
   tapped.add(k);

@@ -213,6 +213,7 @@ function drawFurniture(ctx, f, t) {
 
 function drawVisionMask(ctx, game, view, cam, viewer) {
   const { x, y, w, h } = view;
+  if (w < 1 || h < 1) return; // window not laid out yet
   const r = game.visionOf(viewer);
   const m = maskCanvas('v' + viewer.id, w, h);
   const g = m.getContext('2d');

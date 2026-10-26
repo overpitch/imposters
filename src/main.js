@@ -3,7 +3,9 @@ import { ShipMap, VENTS, SABOTAGES } from './map.js';
 import { Game } from './game.js';
 import { Input } from './input.js';
 import { drawWorld, drawHud, drawKillSplash } from './render.js';
-import { drawLobby, drawReveal, drawMap, drawMeeting, drawEject, drawOver, drawControllerHelp, chatOptions } from './ui.js';
+import { drawLobby, drawReveal, drawMap, drawMeeting, drawEject, drawOver, drawControllerHelp, OSK_ROWS } from './ui.js';
+import { typing, startTyping, stopTyping } from './input.js';
+import { parseStatement } from './bots.js';
 import { makeMiniGame } from './tasks.js';
 import { text, setGlyphs } from './draw.js';
 import { settings, saveSettings, ROLE_CHOICES } from './settings.js';
@@ -126,7 +128,7 @@ function newUi(player) {
     cam: { x: player.x, y: player.y, z: 1 },
     mini: null, miniUse: null, menu: null, sabSel: 0, ventSel: null, ventStickWas: false,
     splash: null, toast: '', toastT: 0,
-    cursor: player.id, confirm: false, chat: false, chatSel: 0,
+    cursor: player.id, confirm: false, typing: null,
     missingSince: null,
   };
 }
@@ -256,14 +258,7 @@ function updateMeetingInput() {
   for (const h of humans) {
     const p = h.player, ui = h.ui, id = p.device;
     if (!p.alive || !input.state(id)) continue;
-    if (ui.chat) {
-      const opts = chatOptions(game, h);
-      if (input.pressed(id, 'up')) ui.chatSel = (ui.chatSel + opts.length - 1) % opts.length;
-      if (input.pressed(id, 'down')) ui.chatSel = (ui.chatSel + 1) % opts.length;
-      if (input.pressed(id, 'b')) ui.chat = false;
-      if (input.pressed(id, 'a')) { const o = opts[ui.chatSel]; game.say(p, o.text, o.meta); ui.chat = false; }
-      continue;
-    }
+    if (ui.typing) { updateTyping(h); continue; }
     // Cursor over the 2x4 grid + Skip (index 8).
     const c = ui.cursor;
     if (input.pressed(id, 'left') && c < 8) ui.cursor = c % 2 ? c - 1 : c;
@@ -271,7 +266,14 @@ function updateMeetingInput() {
     if (input.pressed(id, 'up')) ui.cursor = c === 8 ? 6 : c >= 2 ? c - 2 : c;
     if (input.pressed(id, 'down')) ui.cursor = c >= 6 ? 8 : c + 2;
     if (ui.cursor !== c) { ui.confirm = false; sfx('blip'); }
-    if (input.pressed(id, 'x')) { ui.chat = true; ui.chatSel = 0; ui.confirm = false; }
+    const keyboard = input.isKeyboard(id);
+    if (input.pressed(id, 'x') || (keyboard && input.keysPressed?.has('KeyT'))) {
+      if (keyboard && typing.active) continue; // one keyboard typist at a time
+      ui.typing = { text: '', osk: { r: 0, c: 0 } };
+      ui.confirm = false;
+      if (keyboard) startTyping();
+      continue;
+    }
     if (input.pressed(id, 'b')) ui.confirm = false;
     if (input.pressed(id, 'a') && m.phase === 'vote' && !m.votes.has(p.id)) {
       const target = ui.cursor === 8 ? 'skip' : game.players[ui.cursor];
@@ -280,6 +282,50 @@ function updateMeetingInput() {
       else { game.vote(p, target); ui.confirm = false; }
     }
   }
+}
+
+function sendChat(h) {
+  const msg = h.ui.typing.text.trim();
+  if (msg) game.say(h.player, msg, parseStatement(game, h.player, msg));
+  closeTyping(h);
+}
+function closeTyping(h) {
+  if (h.ui.typing && input.isKeyboard(h.player.device)) stopTyping();
+  h.ui.typing = null;
+}
+
+/** Typing a chat message: real keyboard, or the on-screen keyboard with a controller. */
+function updateTyping(h) {
+  const t = h.ui.typing, id = h.player.device;
+  if (input.isKeyboard(id)) {
+    t.text = typing.text;
+    if (typing.submit) sendChat(h);
+    else if (typing.cancel) closeTyping(h);
+    return;
+  }
+  const o = t.osk;
+  const moveRow = (dr) => {
+    const from = OSK_ROWS[o.r];
+    o.r = (o.r + dr + OSK_ROWS.length) % OSK_ROWS.length;
+    const to = OSK_ROWS[o.r];
+    o.c = Math.min(to.length - 1, Math.round(((o.c + 0.5) / from.length) * to.length - 0.5));
+  };
+  if (input.pressed(id, 'up')) moveRow(-1);
+  if (input.pressed(id, 'down')) moveRow(1);
+  if (input.pressed(id, 'left')) o.c = (o.c + OSK_ROWS[o.r].length - 1) % OSK_ROWS[o.r].length;
+  if (input.pressed(id, 'right')) o.c = (o.c + 1) % OSK_ROWS[o.r].length;
+  if (input.pressed(id, 'y')) { sendChat(h); return; }
+  if (input.pressed(id, 'b')) { if (t.text) t.text = t.text.slice(0, -1); else closeTyping(h); return; }
+  if (!input.pressed(id, 'a')) return;
+  const k = OSK_ROWS[o.r][o.c];
+  if (k === 'SEND') { sendChat(h); return; }
+  if (k === '⌫') { t.text = t.text.slice(0, -1); return; }
+  if (t.text.length >= 70) return;
+  if (k === 'SPACE') { t.text += ' '; return; }
+  if (o.r < 2) { t.text += (t.text && !t.text.endsWith(' ') ? ' ' : '') + k + ' '; return; } // color names
+  const startOfSentence = !t.text.trim() || /[.!?]\s*$/.test(t.text);
+  t.text += /[A-Z]/.test(k) && !startOfSentence ? k.toLowerCase() : k;
+  sfx('blip');
 }
 
 function handleEvents() {
@@ -296,7 +342,7 @@ function handleEvents() {
       case 'report': case 'emergency':
         sfx(e.type === 'report' ? 'report' : 'meeting');
         for (const h of humans) {
-          closeMini(h); h.ui.menu = null; h.ui.confirm = false; h.ui.chat = false; h.ui.cursor = h.player.id;
+          closeMini(h); h.ui.menu = null; h.ui.confirm = false; closeTyping(h); h.ui.cursor = h.player.id;
           input.rumble(h.player.device, 300, 0.5, 0.5);
         }
         break;
@@ -327,6 +373,8 @@ function updateGame(dt) {
   }
   if (game.state === 'play') for (const h of humans) updateHuman(h, dt);
   if (game.state === 'meeting') updateMeetingInput();
+  // Meeting over (or typing window closed): stop capturing the keyboard.
+  if (game.state !== 'meeting' || !['discuss', 'vote'].includes(game.meeting?.phase)) for (const h of humans) if (h.ui.typing) closeTyping(h);
 
   const steps = Math.ceil(dt / (1 / 30));
   for (let i = 0; i < steps; i++) game.update(dt / steps);
@@ -351,6 +399,7 @@ function updateCam(ui, p, view, dt) {
 }
 
 function render(dt) {
+  if (W < 1 || H < 1) { resize(); if (W < 1 || H < 1) return; } // hidden / not laid out yet
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.fillStyle = '#000';
   ctx.fillRect(0, 0, W, H);

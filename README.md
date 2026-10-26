@@ -25,7 +25,7 @@ Press **C** in the lobby (or pick *Computer* under Controls). One keyboard playe
 |---|---|
 | WASD / arrows | Move (and menus) |
 | E / Space / Enter | Use, join, ready, vote |
-| Q | Kill (Imposters) · quick chat in meetings |
+| Q / T | Kill (Imposters) · chat in meetings (type, Enter sends) |
 | R | Report a body |
 | Tab / M | Map |
 | F | Sabotage menu (Imposters) |
@@ -46,7 +46,10 @@ the keyboard player.
 | **RB** | Sabotage menu (Imposters) |
 | **B** | Close a task or menu |
 
-In meetings: stick picks a player (or Skip), **A** then **A** again to vote, **X** for quick chat.
+In meetings: stick picks a player (or Skip), **A** then **A** again to vote. **X** opens chat: type
+anything with the on-screen keyboard (stick + **A** types, **B** deletes, **Y** sends; the top rows type
+whole color names). On a computer, press **Q** or **T**, type, **Enter** to send, **Esc** to cancel.
+Bots read what you type: name a color with words like *vent*, *kill*, *sus*, *safe* (or *not*), or ask *where?*
 The game never needs ☰ or View, because Edge on Xbox keeps those buttons for itself.
 
 ## Run locally

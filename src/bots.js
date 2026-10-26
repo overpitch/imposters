@@ -469,9 +469,36 @@ function topSuspect(game, p) {
   return best;
 }
 
+/**
+ * Turn a typed message into something bots can weigh: { kind: 'kill'|'vent'|'sus'|'safe', target }
+ * when it names a player, or { question: 'where' }. Plain chatter returns null.
+ */
+export function parseStatement(game, speaker, text) {
+  const t = ` ${text.toLowerCase().replace(/[^a-z' ]+/g, ' ').replace(/'/g, '')} `;
+  const named = game.players
+    .filter((p) => p !== speaker && t.includes(` ${p.name.toLowerCase()} `))
+    .sort((a, b) => t.indexOf(` ${a.name.toLowerCase()} `) - t.indexOf(` ${b.name.toLowerCase()} `));
+  const target = named.find((p) => p.alive);
+  if (!target) return /\bwhere\b/.test(t) ? { question: 'where' } : null;
+  const neg = /\b(not|isnt|wasnt|didnt|never|aint)\b/.test(t);
+  let kind = null;
+  if (/\bvent(ed|ing|s)?\b/.test(t)) kind = 'vent';
+  else if (/\b(kill|kills|killed|killing|murder|murdered|stab|stabbed|did it|do it)\b/.test(t)) kind = 'kill';
+  else if (/\b(safe|clear|cleared|innocent|trust|scanned|with me|crewmate)\b/.test(t)) kind = 'safe';
+  else if (/\b(sus|suspicious|sussy|imposter|impostor|vote|liar|lying|weird|sketchy|its)\b/.test(t)) kind = 'sus';
+  if (kind && neg) kind = kind === 'safe' ? 'sus' : 'safe';
+  return kind ? { kind, target: target.id } : null;
+}
+
 /** Someone said something in a meeting; bots weigh it. */
 export function hearChat(game, speaker, meta) {
   const m = game.meeting;
+  if (m && meta?.question === 'where' && m.body && !m.answeredWhere) {
+    // Someone asks where the body was: the reporter (or another bot) answers.
+    const who = (m.caller?.bot && m.caller.alive) ? m.caller : game.players.find((p) => p.bot && p.alive && p !== speaker);
+    if (who) { m.answeredWhere = true; queue(who.bot, m.elapsed + rand(1, 2.5), `In ${m.bodyRoom}.`, null); }
+    return;
+  }
   if (!m || !meta || meta.target === undefined) return;
   const target = game.players[meta.target];
   const weight = { kill: 70, vent: 65, with: 25, sus: 10, safe: -40 }[meta.kind] ?? 0;
